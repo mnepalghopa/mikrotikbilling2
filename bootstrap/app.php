@@ -29,6 +29,8 @@ return Application::configure(basePath: dirname(__DIR__))
             '/payment/nagad/callback',
             '/payment/sslcommerz/callback',
             '/payment/mock/submit',
+            '/payment/*/callback',
+            '/payment/paybridge/*',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

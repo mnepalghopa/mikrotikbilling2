@@ -245,10 +245,10 @@ class HotspotManager extends Component
         $days = [];
         $sums = [];
         for ($i = 6; $i >= 0; $i--) {
-            $date = now()->subDays($i)->toDateString();
-            $days[] = now()->subDays($i)->format('D');
-            $sums[] = HotspotSale::forRouter($this->selectedRouter)
-                ->whereDate('sale_date', $date)
+            $day = now()->copy()->subDays($i); // use copy() to avoid mutating the base Carbon instance
+            $days[] = $day->format('D');
+            $sums[] = (float) HotspotSale::forRouter($this->selectedRouter)
+                ->whereDate('sale_date', $day->toDateString())
                 ->sum('amount');
         }
         $this->chartData = ['labels' => $days, 'data' => $sums];

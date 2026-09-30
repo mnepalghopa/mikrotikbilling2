@@ -248,4 +248,34 @@ You should also get your employer (if you work as a programmer) or school, if an
 ৩. **কোড ব্লক বা ক্লোজ-সোর্স করা নিষিদ্ধ:** কেউ এডিট বা মডিফাই করে বিক্রি করলেও কোডটি নিজের জন্য ব্লক বা ক্লোজড-সোর্স (Closed Source) করতে পারবে না। তাকে অবশ্যই সম্পূর্ণ সোর্স কোডটি এই একই AGPLv3 লাইসেন্সের অধীনে ওপেন রাখতে হবে।
 ৪. **SaaS বা ক্লাউড হোস্টিং নিষেধাজ্ঞা (SaaS Loophole Protection):** অনেকে সোর্স কোড নিজের সার্ভারে হোস্ট করে কাস্টমারদের সার্ভিস হিসেবে (Software as a Service - SaaS) ব্যবহার করতে দেয় কিন্তু সোর্স কোড রিলিজ করে না। AGPLv3 লাইসেন্স অনুযায়ী, কেউ যদি এই সফটওয়্যারটি কোনো নেটওয়ার্ক সার্ভারে হোস্ট করে সেবা প্রদান (SaaS) করে, তবে তার ব্যবহারকারী কাস্টমারদের বাধ্যতামূলকভাবে সেই পরিবর্তিত সোর্স কোডটি ডাউনলোড করার সুযোগ দিতে হবে। অর্থাৎ, হোস্টিং করেও কোড লুকিয়ে রাখা যাবে না।
 ৫. **অ্যাট্রিবিউশন এবং কপিরাইট:** কোনো কোম্পানি বা ব্যক্তি এই কোডটিকে নিজের নামে দাবি করতে পারবে না। মূল কপিরাইটে সর্বদা **CodePagol**-এর নাম ও ক্রেডিট নোটিশ থাকতে হবে।
+৬. **UI অ্যাট্রিবিউশন নোটিশ (বাধ্যতামূলক):** অ্যাপ্লিকেশনের যেকোনো পেজে দৃশ্যমানভাবে "Powered by CodePagol" বা "Designed by CodePagol" লেখাটি — https://codepagol.com লিংকসহ — রাখা বাধ্যতামূলক। এটি মুছে ফেলা, লুকিয়ে রাখা, পরিবর্তন করা বা অন্য নামে প্রতিস্থাপন করা সম্পূর্ণ নিষিদ্ধ। এই শর্ত লঙ্ঘন করলে স্বয়ংক্রিয়ভাবে এই লাইসেন্সের সমস্ত অধিকার বাতিল হয়ে যাবে।
+
+
+-------------------------------------------------------------------------------
+ADDITIONAL ATTRIBUTION REQUIREMENT (UI Credit Notice)
+-------------------------------------------------------------------------------
+
+In addition to the standard AGPL-3.0 terms, the following condition applies
+to ALL use, modification, and distribution of this software:
+
+  The visible "Powered by CodePagol" or "Designed by CodePagol" credit
+  notice — including the hyperlink to https://codepagol.com — MUST remain
+  clearly visible in the application's user interface at all times.
+
+You MAY NOT:
+  - Remove, hide, alter, or replace the CodePagol attribution text or link.
+  - Substitute a different brand name, URL, or logo in place of CodePagol.
+  - Use CSS, JavaScript, server-side logic, or any other technique to
+    obscure the notice from end users.
+  - Move the notice to a location that is not reasonably visible to
+    ordinary users of the application.
+
+You MAY:
+  - Restyle (font size, colour, position) the notice as long as it remains
+    clearly legible and visible to ordinary end users.
+  - Add your own additional branding alongside the CodePagol credit.
+
+Violation of this Attribution Requirement immediately and automatically
+terminates your rights under this License without notice, in addition to
+any other remedies available under applicable law.
 

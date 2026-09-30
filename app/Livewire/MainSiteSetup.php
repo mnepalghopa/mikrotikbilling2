@@ -36,6 +36,7 @@ use App\Rules\ValidPhoneDigits;
 use Livewire\Component;
 
 use Livewire\WithFileUploads;
+use PayBridge\Payment\Models\PaymentGatewaySetting;
 
 class MainSiteSetup extends Component implements HasActions, HasForms
 {
@@ -511,11 +512,81 @@ class MainSiteSetup extends Component implements HasActions, HasForms
             ->label('Storage Link')
             ->color('info')
             ->icon('heroicon-m-link')
-            ->requiresConfirmation()
-            ->modalDescription('This will create a symbolic link from "public/storage" to "storage/app/public". Do this once on every new server deployment so your images work!')
-            ->action(function () {
-                Artisan::call('storage:link');
-                flash()->success(Artisan::output());
+            ->modalHeading('Generate Storage Link')
+            ->modalDescription('Creates symbolic links to "storage/app/public". It automatically detects standard Laravel setups (VPS/Local), cPanel (public_html, subdomains, addon domains), or you can specify a custom webroot path.')
+            ->form([
+                TextInput::make('custom_public_path')
+                    ->label('Custom Webroot Directory (Optional)')
+                    ->placeholder(request()->server('DOCUMENT_ROOT') ?: '/home/username/public_html')
+                    ->helperText('Leave blank for auto-detection. Enter a full path only if using a custom addon domain or subdomain path that differs from default.')
+            ])
+            ->action(function (array $data) {
+                $statusMessages = [];
+                $target = storage_path('app/public');
+
+                // 1. Standard Laravel storage:link (VPS, Laragon, Docker, etc.)
+                try {
+                    Artisan::call('storage:link');
+                    $output = trim(Artisan::output());
+                    if ($output) {
+                        $statusMessages[] = $output;
+                    }
+                } catch (\Throwable $e) {
+                    $statusMessages[] = 'Standard storage:link: '.$e->getMessage();
+                }
+
+                // Helper closure to safely create link in candidate directories
+                $linkDirectory = function ($publicDir, $label) use ($target, &$statusMessages) {
+                    if (! $publicDir || ! is_dir($publicDir)) {
+                        return false;
+                    }
+
+                    $shortcut = rtrim($publicDir, '/\\').'/storage';
+
+                    if (is_link($shortcut)) {
+                        @unlink($shortcut);
+                    }
+
+                    if (@symlink($target, $shortcut)) {
+                        $statusMessages[] = "{$label} linked successfully ({$shortcut})!";
+                        return true;
+                    } elseif (is_link($shortcut) || is_dir($shortcut)) {
+                        $statusMessages[] = "{$label} storage link already exists ({$shortcut}).";
+                        return true;
+                    } else {
+                        $statusMessages[] = "Could not link {$label} ({$shortcut}). Check write permissions.";
+                        return false;
+                    }
+                };
+
+                // 2. Custom Path if entered by user
+                if (! empty($data['custom_public_path'])) {
+                    $customDir = trim($data['custom_public_path']);
+                    if (is_dir($customDir)) {
+                        $linkDirectory($customDir, 'Custom Directory');
+                    } else {
+                        $statusMessages[] = "Entered custom directory does not exist: {$customDir}";
+                    }
+                } else {
+                    // 3. Auto-detect from Web Server DOCUMENT_ROOT (cPanel Addon Domain, Subdomain, CyberPanel, etc.)
+                    $docRoot = request()->server('DOCUMENT_ROOT');
+                    if ($docRoot && is_dir($docRoot)) {
+                        $realDocRoot = realpath($docRoot);
+                        $realPublic = realpath(public_path());
+
+                        if ($realDocRoot && $realDocRoot !== $realPublic) {
+                            $linkDirectory($docRoot, 'Webroot (DOCUMENT_ROOT)');
+                        }
+                    }
+
+                    // 4. Check standard cPanel public_html sibling directory
+                    $cpanelPublicHtml = dirname(base_path()).'/public_html';
+                    if (is_dir($cpanelPublicHtml)) {
+                        $linkDirectory($cpanelPublicHtml, 'cPanel public_html');
+                    }
+                }
+
+                flash()->success(implode(' | ', $statusMessages) ?: 'Storage link action completed successfully!');
             });
     }
 
@@ -940,8 +1011,54 @@ class MainSiteSetup extends Component implements HasActions, HasForms
         return array_unique($fields);
     }
 
+    public function togglePayBridgeGateway(string $code): void
+    {
+        $gateway = PaymentGatewaySetting::where('code', $code)->first();
+        if ($gateway) {
+            $gateway->is_active = ! $gateway->is_active;
+            $gateway->save();
+            flash()->success("{$gateway->name} is now " . ($gateway->is_active ? 'Active' : 'Inactive'));
+        }
+    }
+
+    public function togglePayBridgeSandbox(string $code): void
+    {
+        $gateway = PaymentGatewaySetting::where('code', $code)->first();
+        if ($gateway) {
+            $gateway->is_sandbox = ! $gateway->is_sandbox;
+            $gateway->save();
+            flash()->success("{$gateway->name} mode changed to " . ($gateway->is_sandbox ? 'Sandbox (Test)' : 'Live'));
+        }
+    }
+
+    public function setDefaultPayBridgeGateway(string $code): void
+    {
+        $gateway = PaymentGatewaySetting::where('code', $code)->first();
+        if ($gateway) {
+            if ($gateway->is_default) {
+                $gateway->removeDefault();
+                flash()->success("{$gateway->name} is no longer the default gateway.");
+            } else {
+                $gateway->setAsDefault();
+                flash()->success("{$gateway->name} set as primary default gateway!");
+            }
+        }
+    }
+
     public function render()
     {
-        return view('livewire.main-site-setup')->layout('layouts.app');
+        $definitions = PaymentGatewaySetting::getFieldDefinitions();
+
+        // Auto-sync any newly added gateways from PayBridge
+        if (PaymentGatewaySetting::count() < count($definitions)) {
+            PaymentGatewaySetting::seedDefaults();
+        }
+
+        $gateways = PaymentGatewaySetting::orderBy('sort_order', 'asc')->get();
+
+        return view('livewire.main-site-setup', [
+            'paybridgeGateways'    => $gateways,
+            'paybridgeDefinitions' => $definitions,
+        ])->layout('layouts.app');
     }
 }

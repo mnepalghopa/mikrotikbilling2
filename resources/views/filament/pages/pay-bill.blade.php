@@ -241,12 +241,11 @@
                     <hr class="cp-my-4 cp-border-gray-100 dark:cp-border-white/5">
 
                     @php
-                        $bkashActive = siteUrlSettings('payment_bkash_enabled');
-                        $nagadActive = siteUrlSettings('payment_nagad_enabled');
-                        $sslActive = siteUrlSettings('payment_sslcommerz_enabled');
+                        $pbGateways = \PayBridge\Payment\Models\PaymentGatewaySetting::active()->get();
+                        $hasGateways = $pbGateways->isNotEmpty() || siteUrlSettings('payment_bkash_enabled') || siteUrlSettings('payment_nagad_enabled') || siteUrlSettings('payment_sslcommerz_enabled');
                     @endphp
 
-                    @if(!$bkashActive && !$nagadActive && !$sslActive)
+                    @if(!$hasGateways)
                         <div class="cp-p-5 cp-bg-amber-500/10 cp-border cp-border-amber-500/20 cp-text-amber-600 dark:cp-text-amber-400 cp-rounded-2xl cp-text-sm cp-text-center">
                             <svg style="width: 36px; height: 36px; min-width: 36px; min-height: 36px;" class="cp-text-amber-500 cp-mx-auto cp-mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                             <span class="cp-font-bold cp-block cp-mb-1">Gateways Offline</span>
@@ -288,37 +287,84 @@
                                 <label class="cp-text-[11px] cp-font-bold cp-tracking-wider cp-text-gray-500 dark:cp-text-slate-400 cp-block cp-mb-3 cp-uppercase">Select Payment Gateway</label>
                                 <div class="cp-space-y-3">
                                     
-                                    @if($bkashActive)
-                                        <label class="cp-relative cp-flex cp-items-center cp-justify-between cp-p-4 cp-rounded-2xl cp-border cp-transition-all cp-duration-300 cp-cursor-pointer cp-group {{ $paymentMethod === 'bkash' ? 'cp-border-pink-500 cp-bg-pink-500/5 cp-shadow-[0_0_20px_rgba(236,72,153,0.15)] cp-ring-1 cp-ring-pink-500/50' : 'cp-border-gray-200 dark:cp-border-white/5 cp-bg-gray-50/50 dark:cp-bg-slate-950/20 hover:cp-border-gray-300 dark:hover:cp-border-white/15' }}">
-                                            <div class="cp-flex cp-items-center cp-gap-3">
-                                                <input type="radio" name="gateway" value="bkash" wire:model.live="paymentMethod" 
-                                                    class="cp-text-pink-600 focus:cp-ring-pink-500/20 cp-bg-white dark:cp-bg-slate-950 cp-border-gray-300 dark:cp-border-white/10 cp-h-4.5 cp-w-4.5">
-                                                <span class="cp-text-sm cp-font-bold cp-text-gray-900 dark:cp-text-white group-hover:cp-text-pink-500 cp-transition-colors">bKash Checkout</span>
-                                            </div>
-                                            <div class="cp-px-2.5 cp-py-1 cp-bg-pink-600/10 cp-text-pink-500 cp-text-[10px] cp-tracking-wider cp-font-extrabold cp-rounded-lg cp-uppercase">bKash</div>
-                                        </label>
-                                    @endif
+                                    @if($pbGateways->isNotEmpty())
+                                        @foreach($pbGateways as $gw)
+                                            @php
+                                                $c = 'indigo';
+                                                $badgeText = strtoupper($gw->category ?: 'Pay');
+                                                if (str_contains($gw->code, 'bkash')) {
+                                                    $c = 'pink';
+                                                    $badgeText = 'bKash';
+                                                } elseif (str_contains($gw->code, 'nagad')) {
+                                                    $c = 'orange';
+                                                    $badgeText = 'Nagad';
+                                                } elseif (str_contains($gw->code, 'rocket')) {
+                                                    $c = 'purple';
+                                                    $badgeText = 'Rocket';
+                                                } elseif (str_contains($gw->code, 'upay')) {
+                                                    $c = 'amber';
+                                                    $badgeText = 'Upay';
+                                                } elseif (str_contains($gw->code, 'sslcommerz')) {
+                                                    $c = 'blue';
+                                                    $badgeText = 'SSL';
+                                                } elseif (str_contains($gw->code, 'stripe')) {
+                                                    $c = 'violet';
+                                                    $badgeText = 'Stripe';
+                                                } elseif (str_contains($gw->code, 'paypal')) {
+                                                    $c = 'sky';
+                                                    $badgeText = 'PayPal';
+                                                } elseif (str_contains($gw->code, 'binance') || str_contains($gw->code, 'crypto')) {
+                                                    $c = 'yellow';
+                                                    $badgeText = 'Crypto';
+                                                } elseif (str_contains($gw->code, 'qr')) {
+                                                    $c = 'emerald';
+                                                    $badgeText = 'Bangla QR';
+                                                }
+                                                $isSelected = ($paymentMethod === $gw->code);
+                                            @endphp
+                                            <label class="cp-relative cp-flex cp-items-center cp-justify-between cp-p-4 cp-rounded-2xl cp-border cp-transition-all cp-duration-300 cp-cursor-pointer cp-group {{ $isSelected ? 'cp-border-'.$c.'-500 cp-bg-'.$c.'-500/5 cp-shadow-[0_0_20px_rgba(99,102,241,0.15)] cp-ring-1 cp-ring-'.$c.'-500/50' : 'cp-border-gray-200 dark:cp-border-white/5 cp-bg-gray-50/50 dark:cp-bg-slate-950/20 hover:cp-border-gray-300 dark:hover:cp-border-white/15' }}">
+                                                <div class="cp-flex cp-items-center cp-gap-3">
+                                                    <input type="radio" name="gateway" value="{{ $gw->code }}" wire:model.live="paymentMethod" 
+                                                        class="cp-text-indigo-600 focus:cp-ring-indigo-500/20 cp-bg-white dark:cp-bg-slate-950 cp-border-gray-300 dark:cp-border-white/10 cp-h-4.5 cp-w-4.5">
+                                                    <span class="cp-text-sm cp-font-bold cp-text-gray-900 dark:cp-text-white group-hover:cp-text-indigo-500 cp-transition-colors">{{ $gw->name }}</span>
+                                                </div>
+                                                <div class="cp-px-2.5 cp-py-1 cp-bg-indigo-600/10 cp-text-indigo-500 cp-text-[10px] cp-tracking-wider cp-font-extrabold cp-rounded-lg cp-uppercase">{{ $badgeText }}</div>
+                                            </label>
+                                        @endforeach
+                                    @else
+                                        {{-- Legacy fallback if no PayBridge gateway is active --}}
+                                        @if(siteUrlSettings('payment_bkash_enabled'))
+                                            <label class="cp-relative cp-flex cp-items-center cp-justify-between cp-p-4 cp-rounded-2xl cp-border cp-transition-all cp-duration-300 cp-cursor-pointer cp-group {{ $paymentMethod === 'bkash' ? 'cp-border-pink-500 cp-bg-pink-500/5 cp-shadow-[0_0_20px_rgba(236,72,153,0.15)] cp-ring-1 cp-ring-pink-500/50' : 'cp-border-gray-200 dark:cp-border-white/5 cp-bg-gray-50/50 dark:cp-bg-slate-950/20 hover:cp-border-gray-300 dark:hover:cp-border-white/15' }}">
+                                                <div class="cp-flex cp-items-center cp-gap-3">
+                                                    <input type="radio" name="gateway" value="bkash" wire:model.live="paymentMethod" 
+                                                        class="cp-text-pink-600 focus:cp-ring-pink-500/20 cp-bg-white dark:cp-bg-slate-950 cp-border-gray-300 dark:cp-border-white/10 cp-h-4.5 cp-w-4.5">
+                                                    <span class="cp-text-sm cp-font-bold cp-text-gray-900 dark:cp-text-white group-hover:cp-text-pink-500 cp-transition-colors">bKash Checkout</span>
+                                                </div>
+                                                <div class="cp-px-2.5 cp-py-1 cp-bg-pink-600/10 cp-text-pink-500 cp-text-[10px] cp-tracking-wider cp-font-extrabold cp-rounded-lg cp-uppercase">bKash</div>
+                                            </label>
+                                        @endif
 
-                                    @if($nagadActive)
-                                        <label class="cp-relative cp-flex cp-items-center cp-justify-between cp-p-4 cp-rounded-2xl cp-border cp-transition-all cp-duration-300 cp-cursor-pointer cp-group {{ $paymentMethod === 'nagad' ? 'cp-border-orange-500 cp-bg-orange-500/5 cp-shadow-[0_0_20px_rgba(249,115,22,0.15)] cp-ring-1 cp-ring-orange-500/50' : 'cp-border-gray-200 dark:cp-border-white/5 cp-bg-gray-50/50 dark:cp-bg-slate-950/20 hover:cp-border-gray-300 dark:hover:cp-border-white/15' }}">
-                                            <div class="cp-flex cp-items-center cp-gap-3">
-                                                <input type="radio" name="gateway" value="nagad" wire:model.live="paymentMethod" 
-                                                    class="cp-text-orange-600 focus:cp-ring-orange-500/20 cp-bg-white dark:cp-bg-slate-950 cp-border-gray-300 dark:cp-border-white/10 cp-h-4.5 cp-w-4.5">
-                                                <span class="cp-text-sm cp-font-bold cp-text-gray-900 dark:cp-text-white group-hover:cp-text-orange-500 cp-transition-colors">Nagad Pay</span>
-                                            </div>
-                                            <div class="cp-px-2.5 cp-py-1 cp-bg-orange-600/10 cp-text-orange-500 cp-text-[10px] cp-tracking-wider cp-font-extrabold cp-rounded-lg cp-uppercase">Nagad</div>
-                                        </label>
-                                    @endif
+                                        @if(siteUrlSettings('payment_nagad_enabled'))
+                                            <label class="cp-relative cp-flex cp-items-center cp-justify-between cp-p-4 cp-rounded-2xl cp-border cp-transition-all cp-duration-300 cp-cursor-pointer cp-group {{ $paymentMethod === 'nagad' ? 'cp-border-orange-500 cp-bg-orange-500/5 cp-shadow-[0_0_20px_rgba(249,115,22,0.15)] cp-ring-1 cp-ring-orange-500/50' : 'cp-border-gray-200 dark:cp-border-white/5 cp-bg-gray-50/50 dark:cp-bg-slate-950/20 hover:cp-border-gray-300 dark:hover:cp-border-white/15' }}">
+                                                <div class="cp-flex cp-items-center cp-gap-3">
+                                                    <input type="radio" name="gateway" value="nagad" wire:model.live="paymentMethod" 
+                                                        class="cp-text-orange-600 focus:cp-ring-orange-500/20 cp-bg-white dark:cp-bg-slate-950 cp-border-gray-300 dark:cp-border-white/10 cp-h-4.5 cp-w-4.5">
+                                                    <span class="cp-text-sm cp-font-bold cp-text-gray-900 dark:cp-text-white group-hover:cp-text-orange-500 cp-transition-colors">Nagad Pay</span>
+                                                </div>
+                                                <div class="cp-px-2.5 cp-py-1 cp-bg-orange-600/10 cp-text-orange-500 cp-text-[10px] cp-tracking-wider cp-font-extrabold cp-rounded-lg cp-uppercase">Nagad</div>
+                                            </label>
+                                        @endif
 
-                                    @if($sslActive)
-                                        <label class="cp-relative cp-flex cp-items-center cp-justify-between cp-p-4 cp-rounded-2xl cp-border cp-transition-all cp-duration-300 cp-cursor-pointer cp-group {{ $paymentMethod === 'sslcommerz' ? 'cp-border-blue-500 cp-bg-blue-500/5 cp-shadow-[0_0_20px_rgba(59,130,246,0.15)] cp-ring-1 cp-ring-blue-500/50' : 'cp-border-gray-200 dark:cp-border-white/5 cp-bg-gray-50/50 dark:cp-bg-slate-950/20 hover:cp-border-gray-300 dark:hover:cp-border-white/15' }}">
-                                            <div class="cp-flex cp-items-center cp-gap-3">
-                                                <input type="radio" name="gateway" value="sslcommerz" wire:model.live="paymentMethod" 
-                                                    class="cp-text-blue-600 focus:cp-ring-blue-500/20 cp-bg-white dark:cp-bg-slate-950 cp-border-gray-300 dark:cp-border-white/10 cp-h-4.5 cp-w-4.5">
-                                                <span class="cp-text-sm cp-font-bold cp-text-gray-900 dark:cp-text-white group-hover:cp-text-blue-500 cp-transition-colors">SSLCommerz</span>
-                                            </div>
-                                            <div class="cp-px-2.5 cp-py-1 cp-bg-blue-600/10 cp-text-blue-500 cp-text-[10px] cp-tracking-wider cp-font-extrabold cp-rounded-lg cp-uppercase">SSL</div>
-                                        </label>
+                                        @if(siteUrlSettings('payment_sslcommerz_enabled'))
+                                            <label class="cp-relative cp-flex cp-items-center cp-justify-between cp-p-4 cp-rounded-2xl cp-border cp-transition-all cp-duration-300 cp-cursor-pointer cp-group {{ $paymentMethod === 'sslcommerz' ? 'cp-border-blue-500 cp-bg-blue-500/5 cp-shadow-[0_0_20px_rgba(59,130,246,0.15)] cp-ring-1 cp-ring-blue-500/50' : 'cp-border-gray-200 dark:cp-border-white/5 cp-bg-gray-50/50 dark:cp-bg-slate-950/20 hover:cp-border-gray-300 dark:hover:cp-border-white/15' }}">
+                                                <div class="cp-flex cp-items-center cp-gap-3">
+                                                    <input type="radio" name="gateway" value="sslcommerz" wire:model.live="paymentMethod" 
+                                                        class="cp-text-blue-600 focus:cp-ring-blue-500/20 cp-bg-white dark:cp-bg-slate-950 cp-border-gray-300 dark:cp-border-white/10 cp-h-4.5 cp-w-4.5">
+                                                    <span class="cp-text-sm cp-font-bold cp-text-gray-900 dark:cp-text-white group-hover:cp-text-blue-500 cp-transition-colors">SSLCommerz</span>
+                                                </div>
+                                                <div class="cp-px-2.5 cp-py-1 cp-bg-blue-600/10 cp-text-blue-500 cp-text-[10px] cp-tracking-wider cp-font-extrabold cp-rounded-lg cp-uppercase">SSL</div>
+                                            </label>
+                                        @endif
                                     @endif
                                     
                                     @error('paymentMethod') <span class="cp-text-xs cp-text-rose-500 cp-mt-2 cp-block cp-font-medium">{{ $message }}</span> @enderror

@@ -608,8 +608,6 @@ class MikrotikController extends Controller
         } catch (\Exception $e) {
             // Priority 2: Hard Disable Fallback
             // If 'Expired' profile doesn't exist, we must ensure the user is completely cut off.
-            \Log::warning("Soft-disable failed for {$username} on {$routerName}. Falling back to hard disable. Error: ".$e->getMessage());
-
             try {
                 // Using 'set disabled=yes' is more universal than the 'disable' command for secrets
                 $this->singleWrite($routerName, "/ppp secret set [find name={$quotedUser}] disabled=yes");

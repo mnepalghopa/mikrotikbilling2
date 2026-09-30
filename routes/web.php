@@ -15,6 +15,7 @@ use App\Http\Controllers\ImportController;
 use App\Http\Controllers\MainSiteController;
 use App\Http\Controllers\Payment\BkashPaymentController;
 use App\Http\Controllers\Payment\NagadPaymentController;
+use App\Http\Controllers\Payment\PayBridgePaymentController;
 use App\Http\Controllers\Payment\SslCommerzPaymentController;
 use App\Http\Controllers\Portal\PortalVoucherController;
 use App\Http\Controllers\Reseller\ResellerDashboardController;
@@ -265,9 +266,25 @@ Route::domain('portal.'.$baseDomain)->group(function () {
     Route::any('/payment/bkash/callback', [BkashPaymentController::class, 'callback'])->name('payment.bkash.callback');
     Route::any('/payment/nagad/callback', [NagadPaymentController::class, 'callback'])->name('payment.nagad.callback');
     Route::any('/payment/sslcommerz/callback', [SslCommerzPaymentController::class, 'callback'])->name('payment.sslcommerz.callback');
+    
+    // PayBridge standard callback endpoints
+    Route::any('/payment/{gateway}/callback', [PayBridgePaymentController::class, 'callback'])->name('payment.paybridge.callback');
+    Route::any('/payment/{gateway}/success', [PayBridgePaymentController::class, 'success'])->name('payment.success');
+    Route::any('/payment/{gateway}/fail', [PayBridgePaymentController::class, 'fail'])->name('payment.fail');
+    Route::any('/payment/{gateway}/cancel', [PayBridgePaymentController::class, 'cancel'])->name('payment.cancel');
+    Route::any('/payment/{gateway}/webhook', [PayBridgePaymentController::class, 'webhook'])->name('payment.webhook');
     Route::post('/payment/mock/submit', [BkashPaymentController::class, 'mockSubmit'])->name('payment.mock.submit');
 
     // Public voucher redemption route
     Route::get('/recharge/voucher', [PortalVoucherController::class, 'showRechargeForm'])->name('portal.voucher.recharge');
     Route::post('/recharge/voucher', [PortalVoucherController::class, 'redeem'])->name('portal.voucher.redeem');
 });
+
+// Fallback universal PayBridge routes (for root host or IP redirects)
+Route::any('/payment/{gateway}/callback', [PayBridgePaymentController::class, 'callback'])->name('payment.paybridge.callback.fallback');
+Route::any('/payment/{gateway}/success', [PayBridgePaymentController::class, 'success'])->name('payment.success.fallback');
+Route::any('/payment/{gateway}/fail', [PayBridgePaymentController::class, 'fail'])->name('payment.fail.fallback');
+Route::any('/payment/{gateway}/cancel', [PayBridgePaymentController::class, 'cancel'])->name('payment.cancel.fallback');
+Route::any('/payment/{gateway}/webhook', [PayBridgePaymentController::class, 'webhook'])->name('payment.webhook.fallback');
+
+

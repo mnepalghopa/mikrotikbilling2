@@ -532,3 +532,11 @@
         </li>
     </ul>
 @endif
+
+{{-- Attribution notice — required by LICENSE. Do not remove. See: https://codepagol.com --}}
+<div class="text-center py-2 mt-auto" style="font-size:0.7rem; opacity:0.55;">
+    <a href="https://codepagol.com" target="_blank" rel="noopener"
+       style="color:inherit; text-decoration:none;">
+        Powered by CodePagol
+    </a>
+</div>

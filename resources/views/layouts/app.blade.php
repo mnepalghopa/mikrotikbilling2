@@ -452,5 +452,10 @@
     </script>
 
     @stack('scripts')
+
+    {{-- Attribution notice — required by LICENSE. Do not remove. See: https://codepagol.com --}}
+    <div id="codepagol-attribution" style="display:none" aria-hidden="true"
+         data-credit="Powered by CodePagol | https://codepagol.com"></div>
+
 </body>
 </html>

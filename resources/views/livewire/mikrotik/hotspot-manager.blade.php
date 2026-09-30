@@ -1415,7 +1415,11 @@
 
                 if (salesChart) salesChart.destroy();
 
-                const chartData = @json($chartData ?? ['labels' => [], 'data' => []]);
+                const rawChart = @json($chartData ?? ['labels' => [], 'data' => []]);
+                const chartData = {
+                    labels: Array.isArray(rawChart.labels) ? rawChart.labels : [],
+                    data:   Array.isArray(rawChart.data)   ? rawChart.data   : [],
+                };
                 const options = {
                     series: [{
                         name: '{{ __('Daily Sales') }}',

@@ -58,8 +58,15 @@ class PayBill extends Page
         $due = (float) $this->billing->due_amount;
         $this->amount = $due > 0 ? $due : (float) $this->billing->monthly_rent;
 
-        // Set default payment method based on what's active
-        if (siteUrlSettings('payment_bkash_enabled')) {
+        // Set default payment method based on what's active in PayBridge or siteUrlSettings
+        $pbDefault = \PayBridge\Payment\Models\PaymentGatewaySetting::where('is_default', true)->where('is_active', true)->value('code');
+        $pbFirst = \PayBridge\Payment\Models\PaymentGatewaySetting::active()->value('code');
+
+        if ($pbDefault) {
+            $this->paymentMethod = $pbDefault;
+        } elseif ($pbFirst) {
+            $this->paymentMethod = $pbFirst;
+        } elseif (siteUrlSettings('payment_bkash_enabled')) {
             $this->paymentMethod = 'bkash';
         } elseif (siteUrlSettings('payment_nagad_enabled')) {
             $this->paymentMethod = 'nagad';
@@ -116,12 +123,70 @@ class PayBill extends Page
     {
         $this->validate([
             'amount' => 'required|numeric|min:1',
-            'paymentMethod' => 'required|in:bkash,nagad,sslcommerz',
+            'paymentMethod' => 'required|string',
         ]);
 
-        $routeParams = ['amount' => $this->amount];
+        // Check if chosen method is managed by PayBridge
+        $pbGateway = \PayBridge\Payment\Models\PaymentGatewaySetting::where('code', $this->paymentMethod)
+            ->where('is_active', true)
+            ->first();
 
-        // Auto-detect local development to offer sandbox mock helper
+        if ($pbGateway) {
+            $trxId = 'PB_' . $this->customer->id . '_' . time();
+            $callbackUrl = route('payment.paybridge.callback', ['gateway' => $this->paymentMethod]);
+
+            session([
+                'paybridge_customer_id' => $this->customer->id,
+                'paybridge_customer_unique_id' => $this->customer->customer_unique_id,
+                'paybridge_amount' => (float)$this->amount,
+                'paybridge_trx' => $trxId,
+                'paybridge_gateway' => $this->paymentMethod,
+            ]);
+
+            $payload = [
+                'amount'         => (float) $this->amount,
+                'transaction_id' => $trxId,
+                'currency'       => 'BDT',
+                'payer_reference'=> $this->customer->customer_unique_id,
+                'customer_name'  => $this->customer->customer_name ?: 'Customer',
+                'customer_email' => $this->customer->email ?: 'customer@isp.local',
+                'customer_phone' => $this->customer->mobile ?: '01700000000',
+                'callback_url'   => $callbackUrl,
+                'success_url'    => $callbackUrl,
+                'fail_url'       => $callbackUrl,
+                'cancel_url'     => $callbackUrl,
+            ];
+
+            try {
+                $response = \PayBridge\Payment\Facades\PayBridge::driver($this->paymentMethod)->pay($payload);
+
+                if (! empty($response['success']) && ! empty($response['redirect_url'])) {
+                    return redirect()->away($response['redirect_url']);
+                }
+
+                // Bangla QR: show QR code inline instead of redirect
+                if (! empty($response['success']) && $this->paymentMethod === 'bangla_qr' && ! empty($response['qr_image_url'])) {
+                    session([
+                        'bangla_qr_image'  => $response['qr_image_url'],
+                        'bangla_qr_trx'    => $response['transaction_id'] ?? $trxId,
+                        'bangla_qr_amount' => (float) $this->amount,
+                    ]);
+                    return redirect()->route('filament.portal.pages.pay-bill')
+                        ->with('bangla_qr', true);
+                }
+
+                $errorMsg = $response['message'] ?? 'Unable to initiate payment with ' . $pbGateway->name;
+                session()->flash('error', $errorMsg);
+                return;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error("PayBridge initiation failed for [{$this->paymentMethod}]: " . $e->getMessage());
+                session()->flash('error', 'Payment gateway error: ' . $e->getMessage());
+                return;
+            }
+        }
+
+        // Fallback to legacy routes if legacy code is used
+        $routeParams = ['amount' => $this->amount];
         $host = request()->getHost();
         $isLocal = str_ends_with($host, '.test') || str_ends_with($host, '.local') || $host === 'localhost' || $host === '127.0.0.1';
 
@@ -136,5 +201,7 @@ class PayBill extends Page
         } elseif ($this->paymentMethod === 'sslcommerz') {
             return redirect()->route('payment.sslcommerz.initiate', $routeParams);
         }
+
+        session()->flash('error', 'Selected payment gateway is currently unavailable.');
     }
 }

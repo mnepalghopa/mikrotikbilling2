@@ -29,14 +29,42 @@ class CollectionReportController extends Controller
         //     abort(403);
         // }
         if ($request->ajax()) {
-            $from = $request->fromDate ?? Carbon::now()->startOfMonth()->format('Y-m-d');
-            $to = $request->toDate ?? Carbon::now()->endOfMonth()->format('Y-m-d');
-            $customer = $request->collector;
+            $query = CollectionSummary::with([
+                'customer',
+                'customer.pppUser',
+                'customer.billing',
+                'customer.customerAddress',
+            ]);
 
-            // Build query
-            $query = CollectionSummary::with('customer', 'customer.pppUser')->whereBetween('collection_date', [$from, $to])->orderBy('created_at', 'desc');
-            if ($customer) {
-                $query->where('collected_by', $customer);
+            if ($request->filled('fromDate') && $request->filled('toDate')) {
+                $from = Carbon::parse($request->fromDate)->startOfDay();
+                $to = Carbon::parse($request->toDate)->endOfDay();
+                $query->whereBetween('collection_date', [$from, $to]);
+            } elseif ($request->filled('fromDate')) {
+                $from = Carbon::parse($request->fromDate)->startOfDay();
+                $query->where('collection_date', '>=', $from);
+            } elseif ($request->filled('toDate')) {
+                $to = Carbon::parse($request->toDate)->endOfDay();
+                $query->where('collection_date', '<=', $to);
+            } else {
+                $from = Carbon::now()->startOfMonth()->startOfDay();
+                $to = Carbon::now()->endOfMonth()->endOfDay();
+                $query->whereBetween('collection_date', [$from, $to]);
+            }
+
+            if ($request->filled('collector')) {
+                $query->where('collected_by', $request->collector);
+            }
+
+            if (! $request->has('order')) {
+                $query->orderBy('created_at', 'asc');
+            }
+
+            $userMap = [];
+            foreach (User::select('name', 'email')->get() as $u) {
+                if ($u->email) {
+                    $userMap[strtolower(trim($u->email))] = trim($u->name);
+                }
             }
 
             return DataTables::of($query)
@@ -44,37 +72,59 @@ class CollectionReportController extends Controller
                 ->addColumn('customer_name', function ($row) {
                     return $row->customer->customer_name ?? 'N/A';
                 })
+                ->addColumn('mobile', function ($row) {
+                    return $row->customer->mobile ?? 'N/A';
+                })
                 ->addColumn('customers_address', function ($row) {
-                    $addresses = CustomersAddress::select('input_type_text', 'input_type_dropdown', 'input_type_textarea')
-                        ->where('customer_address_unique_id', $row->customer_collection_unique_id)
-                        ->get(); // Fetch all addresses
-                    // Initialize an array to hold the formatted addresses
+                    $addresses = $row->customer->customerAddress ?? collect();
                     $formattedAddresses = [];
-
-                    // Loop through each address record
                     foreach ($addresses as $address) {
-                        $addressParts = [];
-                        // Add parts of the address if they exist
-                        if ($address->input_type_text) {
-                            $addressParts[] = $address->input_type_text;
+                        $parts = array_filter([
+                            $address->input_type_text,
+                            $address->input_type_dropdown,
+                            $address->input_type_textarea,
+                        ]);
+                        if (!empty($parts)) {
+                            $formattedAddresses[] = implode(', ', $parts);
                         }
-                        if ($address->input_type_dropdown) {
-                            $addressParts[] = $address->input_type_dropdown;
-                        }
-                        if ($address->input_type_textarea) {
-                            $addressParts[] = $address->input_type_textarea;
-                        }
-                        // Join the parts and add to the formatted addresses array
-                        $formattedAddresses[] = implode(', ', $addressParts);
                     }
-
-                    // Join all formatted addresses into a single string
-                    return implode(', ', $formattedAddresses); // Use a semicolon or any separator you prefer
+                    return !empty($formattedAddresses) ? implode('; ', $formattedAddresses) : 'N/A';
                 })
                 ->addColumn('ppp_secret', function ($row) {
-                    $pppSecret = $row->customer->pppUser;
+                    return $row->customer->pppUser->username ?? 'N/A';
+                })
+                ->addColumn('monthly_rent', function ($row) {
+                    return (float) ($row->customer->billing->monthly_rent ?? 0);
+                })
+                ->addColumn('discount', function ($row) {
+                    return (float) ($row->customer->billing->discount ?? 0);
+                })
+                ->addColumn('due_amount', function ($row) {
+                    return (float) ($row->customer->billing->due_amount ?? 0);
+                })
+                ->addColumn('payment_method', function ($row) {
+                    return ucfirst($row->payment_method ?? ($row->payment_type ?? 'Cash'));
+                })
+                ->addColumn('transaction_id', function ($row) {
+                    return $row->transaction_id ?? '';
+                })
+                ->addColumn('invoice_no', function ($row) {
+                    return $row->id ? '#' . siteUrlSettings('site_invoice_prefix') . $row->id : 'N/A';
+                })
+                ->addColumn('collected_by', function ($row) use ($userMap) {
+                    $collectedBy = trim($row->collected_by ?? '');
+                    if (empty($collectedBy)) {
+                        return 'N/A';
+                    }
 
-                    return $pppSecret ? $pppSecret->username : 'N/A';
+                    $lower = strtolower($collectedBy);
+                    $name = $userMap[$lower] ?? null;
+
+                    if ($name && strtolower($name) !== $lower) {
+                        return $name . ' (' . $collectedBy . ')';
+                    }
+
+                    return $collectedBy;
                 })
                 ->rawColumns(['customers_address', 'ppp_secret'])
                 ->make(true);

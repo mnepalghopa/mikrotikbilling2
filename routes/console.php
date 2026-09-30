@@ -14,27 +14,27 @@ $timezone = config('app.timezone') ?: 'Asia/Dhaka';
 
 Schedule::call(function () {
     app(ScheduledTasksController::class)->createMonthlyBill();
-})->lastDayOfMonth('23:45')->timezone($timezone);
+})->name('create-monthly-bill')->lastDayOfMonth('23:45')->timezone($timezone)->withoutOverlapping();
 
 Schedule::call(function () {
     app(ScheduledTasksController::class)->allCustomersMonthlyBillSMS();
-})->monthlyOn(1, '10:00')->timezone($timezone);
+})->name('monthly-bill-sms')->monthlyOn(1, '10:00')->timezone($timezone)->withoutOverlapping();
 
 Schedule::call(function () {
     app(ScheduledTasksController::class)->createAlert();
-})->dailyAt('08:00')->timezone($timezone);
+})->name('create-alert')->dailyAt('08:00')->timezone($timezone)->withoutOverlapping();
 
 Schedule::call(function () {
     app(ScheduledTasksController::class)->userDisable();
-})->dailyAt('08:30')->timezone($timezone);
+})->name('user-disable')->dailyAt('08:30')->timezone($timezone)->withoutOverlapping();
 
 Schedule::call(function () {
     app(MikrotikSync::class)->allSync();
-})->daily()->timezone($timezone);
+})->name('mikrotik-all-sync')->daily()->timezone($timezone)->withoutOverlapping();
 
 Schedule::call(function () {
     Artisan::call('app:poll-router-logs');
-})->everyMinute();
+})->name('poll-router-logs')->everyMinute()->withoutOverlapping();
 
 Schedule::call(function () {
     Artisan::call('app:expire-realtime-hotspot-users');
@@ -43,11 +43,11 @@ Schedule::call(function () {
 Schedule::call(function () {
     $days = (int) MainSiteData::getValue('log_retention_days', 30);
     app(MikrotikController::class)->pruneOldLogs($days);
-})->dailyAt('04:00');
+})->name('prune-old-logs')->dailyAt('04:00')->timezone($timezone)->withoutOverlapping();
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote')->hourly();
+})->purpose('Display an inspiring quote')->daily();
 
 // Schedule::call(function () {
 //     Log::info('Hello World', [
