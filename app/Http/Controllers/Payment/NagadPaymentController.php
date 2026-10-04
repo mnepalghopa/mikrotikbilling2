@@ -42,6 +42,12 @@ class NagadPaymentController extends Controller
 
         $customer = $user->customer;
 
+        // Store customer identity in session for callback recovery (session may expire before Nagad redirects back)
+        session([
+            'nagad_customer_id'        => $customer->id,
+            'nagad_customer_unique_id' => $customer->customer_unique_id,
+        ]);
+
         // Auto-detect local development to offer sandbox mock helper
         $host = request()->getHost();
         $isLocal = str_ends_with($host, '.test') || str_ends_with($host, '.local') || $host === 'localhost' || $host === '127.0.0.1';
@@ -219,10 +225,26 @@ class NagadPaymentController extends Controller
 
                         if (isset($decryptedVerifyJson['status']) && $decryptedVerifyJson['status'] === 'Success') {
                             $amount = (float) $decryptedVerifyJson['amount'];
-                            $customer = auth()->user() ? auth()->user()->customer : null;
+
+                            // Resolve customer: prefer live auth session, fall back to session stored at initiation
+                            $customer = auth()->user()?->customer
+                                ?? \App\Models\CustomersInfo::find(session('nagad_customer_id'));
 
                             if ($customer) {
+                                // Idempotency guard: prevent double-credit on callback replay
+                                if (\App\Models\CollectionSummary::where('transaction_id', $paymentRefId)->exists()) {
+                                    Log::warning('Nagad duplicate callback blocked', [
+                                        'payment_ref_id'     => $paymentRefId,
+                                        'customer_unique_id' => $customer->customer_unique_id,
+                                        'ip'                 => request()->ip(),
+                                    ]);
+                                    session()->forget(['nagad_customer_id', 'nagad_customer_unique_id']);
+                                    return redirect()->route('filament.portal.pages.dashboard')
+                                        ->with('info', 'This payment has already been processed.');
+                                }
+
                                 $this->paymentService->processSuccessPayment($customer, $amount, 'nagad', $paymentRefId);
+                                session()->forget(['nagad_customer_id', 'nagad_customer_unique_id']);
 
                                 return redirect()->route('filament.portal.pages.dashboard')
                                     ->with('success', 'Payment of BDT '.$amount.' received successfully via Nagad. Your account is active.');

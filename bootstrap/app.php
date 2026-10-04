@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->append(CheckSiteStatus::class);
         $middleware->alias([
+            'admin'              => \App\Http\Middleware\EnsureAdminAccess::class,
             'reseller'           => \App\Http\Middleware\EnsureUserIsReseller::class,
             'restrict.profile'   => \App\Http\Middleware\RestrictToProfileIfNoPermissions::class,
             'permission'         => \Spatie\Permission\Middleware\PermissionMiddleware::class,

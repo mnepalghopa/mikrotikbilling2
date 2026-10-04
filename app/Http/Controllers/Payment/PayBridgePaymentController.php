@@ -81,7 +81,46 @@ class PayBridgePaymentController extends Controller
                 }
 
                 if ($customer && $amount > 0) {
+                    if (\App\Models\CollectionSummary::where('transaction_id', $trxId)->exists()) {
+                        activity('payment')
+                            ->event('duplicate_payment')
+                            ->performedOn($customer)
+                            ->causedBy($customer?->user)
+                            ->withProperties([
+                                'attributes' => [
+                                    'customer_unique_id' => $customer->customer_unique_id,
+                                    'customer_name'      => $customer->customer_name,
+                                    'mobile'             => $customer->mobile,
+                                    'gateway'            => $gateway,
+                                    'transaction_id'     => $trxId,
+                                    'amount'             => number_format($amount, 2),
+                                    'ip_address'         => $request->ip(),
+                                    'status'             => 'duplicate_blocked',
+                                ]
+                            ])
+                            ->log("PayBridge webhook duplicate transaction [{$trxId}] ignored for customer {$customer->customer_name} (ID: {$customer->customer_unique_id}).");
+
+                        return response()->json(['success' => true, 'message' => 'Already processed'], 200);
+                    }
+
                     $this->paymentService->processSuccessPayment($customer, $amount, $gateway, $trxId);
+
+                    activity('payment')
+                        ->event('payment_success')
+                        ->performedOn($customer)
+                        ->causedBy($customer?->user)
+                        ->withProperties([
+                            'attributes' => [
+                                'customer_unique_id' => $customer->customer_unique_id,
+                                'customer_name'      => $customer->customer_name,
+                                'mobile'             => $customer->mobile,
+                                'gateway'            => $gateway,
+                                'amount'             => number_format($amount, 2),
+                                'transaction_id'     => $trxId,
+                                'ip_address'         => $request->ip(),
+                            ]
+                        ])
+                        ->log("Payment of BDT {$amount} received successfully via {$gateway} webhook for customer {$customer->customer_name} (ID: {$customer->customer_unique_id}). TrxID: {$trxId}");
                 }
 
                 return response()->json(['success' => true, 'message' => 'Processed successfully'], 200);
@@ -136,6 +175,29 @@ class PayBridgePaymentController extends Controller
                 }
 
                 if ($customer && $amount > 0) {
+                    if (\App\Models\CollectionSummary::where('transaction_id', $trxId)->exists()) {
+                        activity('payment')
+                            ->event('duplicate_payment')
+                            ->performedOn($customer)
+                            ->causedBy(auth()->user() ?: $customer?->user)
+                            ->withProperties([
+                                'attributes' => [
+                                    'customer_unique_id' => $customer->customer_unique_id,
+                                    'customer_name'      => $customer->customer_name,
+                                    'mobile'             => $customer->mobile,
+                                    'gateway'            => $gateway,
+                                    'transaction_id'     => $trxId,
+                                    'amount'             => number_format($amount, 2),
+                                    'ip_address'         => $request->ip(),
+                                    'status'             => 'duplicate_blocked',
+                                ]
+                            ])
+                            ->log("Duplicate payment replay attempt blocked for customer {$customer->customer_name} (ID: {$customer->customer_unique_id}) on {$gateway}. TrxID: {$trxId}");
+
+                        return redirect()->route('filament.portal.pages.dashboard')
+                            ->with('info', 'This payment has already been processed.');
+                    }
+
                     $this->paymentService->processSuccessPayment($customer, $amount, $gateway, $trxId);
 
                     // Clear payment session keys
@@ -146,6 +208,23 @@ class PayBridgePaymentController extends Controller
                         'paybridge_trx',
                         'paybridge_gateway',
                     ]);
+
+                    activity('payment')
+                        ->event('payment_success')
+                        ->performedOn($customer)
+                        ->causedBy(auth()->user() ?: $customer?->user)
+                        ->withProperties([
+                            'attributes' => [
+                                'customer_unique_id' => $customer->customer_unique_id,
+                                'customer_name'      => $customer->customer_name,
+                                'mobile'             => $customer->mobile,
+                                'gateway'            => $gateway,
+                                'amount'             => number_format($amount, 2),
+                                'transaction_id'     => $trxId,
+                                'ip_address'         => $request->ip(),
+                            ]
+                        ])
+                        ->log("Payment of BDT {$amount} received successfully via " . ucfirst(str_replace('_', ' ', $gateway)) . " for {$customer->customer_name} (ID: {$customer->customer_unique_id}). TrxID: {$trxId}");
 
                     return redirect()->route('filament.portal.pages.dashboard')
                         ->with('success', "Payment of BDT {$amount} received successfully via " . ucfirst(str_replace('_', ' ', $gateway)) . ". Your account is active.");

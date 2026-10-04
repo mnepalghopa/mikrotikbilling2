@@ -124,6 +124,8 @@ class ExpenseManager extends Component
 
     public function save(): void
     {
+        abortIfNoAccess(['Super Admin', 'Accountant'], ['manage-expenses']);
+
         $this->validate([
             'category'     => 'required|in:item_purchase,raw_bill,employee_salary,reseller_payout,miscellaneous',
             'title'        => 'required|string|max:255',
@@ -199,6 +201,8 @@ class ExpenseManager extends Component
 
     public function delete(int $id): void
     {
+        abortIfNoAccess(['Super Admin'], []);
+
         IspExpense::findOrFail($id)->delete();
         flash()->success('Expense deleted.');
     }

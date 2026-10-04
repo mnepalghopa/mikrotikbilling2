@@ -24,10 +24,29 @@ class ResellerController extends Controller
     }
 
     /**
+     * Authorize admin access to reseller management.
+     * Prevents any reseller or unprivileged user from accessing admin reseller operations.
+     */
+    protected function authorizeAdmin(): void
+    {
+        $user = auth()->user();
+
+        if (! $user || $user->hasRole('Reseller') || $user->reseller !== null) {
+            abort(403, 'Unauthorized action: Reseller accounts cannot perform admin operations.');
+        }
+
+        if (! hasAccess(['Super Admin', 'Admin'], ['create-reseller'])) {
+            abort(403, 'Unauthorized action.');
+        }
+    }
+
+    /**
      * Display a listing of the resellers.
      */
     public function index()
     {
+        $this->authorizeAdmin();
+
         $month = request('month', now()->month);
         $year  = request('year', now()->year);
 
@@ -74,6 +93,8 @@ class ResellerController extends Controller
      */
     public function create()
     {
+        $this->authorizeAdmin();
+
         $packages = PackageList::whereNull('reseller_id')->get();
         $resellerPermissions = $this->getResellerPermissions();
         $defaultPermissions  = $this->getDefaultPermissions();
@@ -85,6 +106,8 @@ class ResellerController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorizeAdmin();
+
         $allowedPermissions = array_keys(array_merge(...array_values($this->getResellerPermissions())));
 
         $request->validate([
@@ -165,6 +188,8 @@ class ResellerController extends Controller
      */
     public function edit(Reseller $reseller)
     {
+        $this->authorizeAdmin();
+
         $reseller->load('user', 'assignedPackages');
         $packages = PackageList::whereNull('reseller_id')->get();
         $assignedPackageIds = $reseller->assignedPackages->pluck('id')->toArray();
@@ -208,6 +233,8 @@ class ResellerController extends Controller
      */
     public function update(Request $request, Reseller $reseller)
     {
+        $this->authorizeAdmin();
+
         $allowedPermissions = array_keys(array_merge(...array_values($this->getResellerPermissions())));
 
         $request->validate([
@@ -309,6 +336,8 @@ class ResellerController extends Controller
      */
     public function destroy(Reseller $reseller)
     {
+        $this->authorizeAdmin();
+
         DB::beginTransaction();
         try {
             $user = $reseller->user;
@@ -337,6 +366,8 @@ class ResellerController extends Controller
      */
     public function adjustBalance(Request $request, Reseller $reseller)
     {
+        $this->authorizeAdmin();
+
         $request->validate([
             'amount' => 'required|numeric|min:0.01',
             'type' => 'required|in:credit,debit,payout',
@@ -469,6 +500,8 @@ class ResellerController extends Controller
      */
     public function getTransactionsJson(Request $request, Reseller $reseller)
     {
+        $this->authorizeAdmin();
+
         $startDate = $request->query('start_date');
         $endDate = $request->query('end_date');
         $txType = $request->query('tx_type');

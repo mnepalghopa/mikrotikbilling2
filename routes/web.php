@@ -204,8 +204,8 @@ Route::middleware([
 
         Route::get('/submit-comment', CommentSubmit::class)->name('submit.comment');
 
-        // Admin Reseller Management
-        Route::prefix('admin')->name('admin.')->group(function () {
+        // Admin Management Routes (Restricted to Admins, inaccessible to Resellers)
+        Route::prefix('admin')->middleware(['admin'])->name('admin.')->group(function () {
             Route::resource('resellers', ResellerController::class)->except(['show']);
             Route::post('resellers/{reseller}/adjust-balance', [ResellerController::class, 'adjustBalance'])->name('resellers.adjust-balance');
             Route::get('resellers/{reseller}/transactions', [ResellerController::class, 'getTransactionsJson'])->name('resellers.transactions');

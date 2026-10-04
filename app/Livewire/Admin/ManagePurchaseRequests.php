@@ -35,6 +35,8 @@ class ManagePurchaseRequests extends Component
 
     public function changeStatus($id, $status)
     {
+        abortIfNoAccess(['Super Admin', 'Admin'], ['manage-purchase-requests']);
+
         $request = PackagePurchaseRequest::findOrFail($id);
         $request->update(['status' => $status]);
         
@@ -52,6 +54,8 @@ class ManagePurchaseRequests extends Component
 
     public function saveDetails()
     {
+        abortIfNoAccess(['Super Admin', 'Admin'], ['manage-purchase-requests']);
+
         $request = PackagePurchaseRequest::findOrFail($this->selectedRequestId);
         $request->update([
             'notes' => $this->selectedRequestNotes,
@@ -64,6 +68,8 @@ class ManagePurchaseRequests extends Component
 
     public function delete($id)
     {
+        abortIfNoAccess(['Super Admin'], []);
+
         PackagePurchaseRequest::findOrFail($id)->delete();
         flash()->success("Request deleted successfully.");
     }

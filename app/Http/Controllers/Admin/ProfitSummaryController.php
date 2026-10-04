@@ -13,8 +13,11 @@ class ProfitSummaryController extends Controller
 {
     public function index()
     {
+        abortIfNoAccess(['Super Admin', 'Accountant'], ['view-profit-summary']);
+
         $month = (int) request('month', now()->month);
         $year  = (int) request('year',  now()->year);
+
 
         $from = Carbon::create($year, $month, 1)->startOfMonth();
         $to   = Carbon::create($year, $month, 1)->endOfMonth();
